@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>발로란트 내전용 가위바위보 프로그램</title>
     <!-- CORS 및 보안 차단이 없는 전역 P2P 시그널링 라이브러리 -->
-    <script src="https://unpkg.com"></script>
+    <script src="https://cloudflare.com"></script>
     <style>
         body {
             font-family: 'Noto Sans KR', sans-serif;
@@ -114,6 +114,53 @@
 </div>
 
 <script>
+    // 기존 스크립트 시작 부근의 로직을 아래와 같이 감싸고 수정합니다.
+
+window.addEventListener('load', () => {
+    if (typeof Peer === 'undefined') {
+        document.getElementById('status').innerText = "라이브러리 로드 실패. 페이지를 새로고침 해주세요.";
+        return;
+    }
+    initGame();
+});
+
+function initGame() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+
+    if (roomParam) {
+        isHost = false;
+        document.getElementById('myRole').innerText = "참가자 (Player 2)";
+        document.getElementById('status').innerText = "방장에게 연결을 시도하는 중...";
+        
+        peer = new Peer();
+        peer.on('open', () => {
+            conn = peer.connect(roomParam);
+            setupConnection();
+        });
+    } else {
+        isHost = true;
+        const randomRoomId = 'vlr-' + Math.random().toString(36).substr(2, 9);
+        peer = new Peer(randomRoomId);
+        
+        peer.on('open', (id) => {
+            // 주소 뒤에 파라미터가 중복으로 쌓이지 않도록 ? 기준으로 분할 처리
+            const baseUrl = window.location.href.split('?')[0];
+            const inviteLink = baseUrl + '?room=' + id;
+            document.getElementById('status').innerHTML = `접속 완료! 상대방에게 아래 링크를 전송하세요.<br><b style="color:#ffb846; font-size:13px; user-select:all;">${inviteLink}</b>`;
+        });
+
+        peer.on('connection', (connection) => {
+            conn = connection;
+            setupConnection();
+        });
+    }
+    
+    peer.on('error', (err) => {
+        console.error(err);
+        document.getElementById('status').innerText = "연결 오류가 발생했습니다. 링크를 다시 확인하세요.";
+    });
+}
     let peer = null;
     let conn = null;
     let myChoice = null;
