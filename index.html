@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=device-width, initial-scale=1.0">
+    <title>발로란트 내전용 가위바위보</title>
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #0f1923; /* 발로란트 스타일 어두운 배경 */
+            color: #ece8e1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: #172535;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            text-align: center;
+            border: 2px solid #ff4655; /* 발로란트 레드 포인트 */
+            width: 90%;
+            max-width: 400px;
+        }
+        h1 {
+            color: #ff4655;
+            margin-bottom: 25px;
+            font-size: 24px;
+        }
+        .buttons {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 30px;
+        }
+        button {
+            background-color: #ece8e1;
+            color: #0f1923;
+            border: none;
+            padding: 15px 20px;
+            font-size: 28px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        button:hover {
+            background-color: #ff4655;
+            color: #ece8e1;
+            transform: translateY(-3px);
+        }
+        .result-box {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #0f1923;
+            border-radius: 8px;
+            min-height: 100px;
+        }
+        .choice-text {
+            font-size: 16px;
+            margin: 10px 0;
+            color: #a3a3a3;
+        }
+        .choice-text span {
+            color: #ece8e1;
+            font-weight: bold;
+        }
+        #finalResult {
+            font-size: 22px;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+        .win { color: #46ff79; }
+        .lose { color: #ff4655; }
+        .draw { color: #ffb846; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>✌️ 내전 진영 결정 가위바위보 ✊</h1>
+    
+    <div class="buttons">
+        <button onclick="play('가위')">✌️</button>
+        <button onclick="play('바위')">✊</button>
+        <button onclick="play('보')">🖐️</button>
+    </div>
+
+    <div class="result-box">
+        <div class="choice-text">내 선택: <span id="userChoice">-</span></div>
+        <div class="choice-text">상대(컴퓨터): <span id="comChoice">-</span></div>
+        <div id="finalResult">선택해주세요!</div>
+    </div>
+</div>
+
+<script>
+    function play(user) {
+        const choices = ['가위', '바위', '보'];
+        // 컴퓨터가 무작위로 하나 선택
+        const com = choices[Math.floor(Math.random() * 3)];
+        
+        // 화면에 선택 결과 표시
+        document.getElementById('userChoice').innerText = user;
+        document.getElementById('comChoice').innerText = com;
+        
+        const resultEl = document.getElementById('finalResult');
+        
+        // 결과 판정 소스
+        if (user === com) {
+            resultEl.innerText = "무승부! 다시 하세요 🤝";
+            resultEl.className = "draw";
+        } else if (
+            (user === '가위' && com === '보') ||
+            (user === '바위' && com === '가위') ||
+            (user === '보' && com === '바위')
+        ) {
+            resultEl.innerText = "승리! 진영 선택권 획득 🎉";
+            resultEl.className = "win";
+        } else {
+            resultEl.innerText = "패배.. 상대방 진영 선택 😢";
+            resultEl.className = "lose";
+        }
+    }
+</script>
+
+</body>
+</html>
