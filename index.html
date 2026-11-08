@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>발로란트 내전용 진영가르기 가위바위보</title>
-    <!-- Firebase SDK 라이브러리 로드 -->
-    <script src="https://gstatic.com"></script>
-    <script src="https://gstatic.com"></script>
+    <title>발로란트 내전용 가위바위보</title>
     <style>
         body {
             font-family: 'Noto Sans KR', sans-serif;
@@ -84,13 +81,16 @@
             font-size: 16px;
             padding: 10px 20px;
             width: 100%;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1> 실시간 매칭 가위바위보 </h1>
+    <h1>실시간 매칭 가위바위보 </h1>
     <div id="status" class="status-indicator">서버 연결 중...</div>
     
     <div class="buttons" id="btnGroup">
@@ -109,43 +109,52 @@
     <button class="reset-btn" id="resetBtn" onclick="requestReset()" style="display:none;">다시 경기하기 🔄</button>
 </div>
 
-<script>
-    // 누구나 테스트할 수 있도록 공개된 임시 Firebase 실시간 DB 연결 설정입니다.
+<!-- 최신 Firebase v10 모듈 스크립트 사용 -->
+<script type="module">
+    import { initializeApp } from "https://gstatic.com";
+    import { getDatabase, ref, onValue, update, get } from "https://gstatic.com";
+
+    // 공용 임시 DB 설정
     const firebaseConfig = {
         databaseURL: "https://firebaseio.com"
     };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database().ref("game_room");
+    
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+    // 💡 아래 "game_room" 부분을 우리 팀만의 영어 단어로 바꾸면 독립된 방이 됩니다!
+    const roomRef = ref(database, "game_room"); 
 
     let myRole = null; 
     let p1Choice = null;
     let p2Choice = null;
 
     // 1. 방 접속 및 플레이어 역할 할당
-    db.once('value', (snapshot) => {
+    get(roomRef).then((snapshot) => {
         const data = snapshot.val() || {};
         if (!data.p1) {
             myRole = 'p1';
-            db.update({ p1: 'connected' });
+            update(roomRef, { p1: 'connected' });
             document.getElementById('myRole').innerText = "플레이어 1 (선공 팀)";
         } else if (!data.p2) {
             myRole = 'p2';
-            db.update({ p2: 'connected' });
+            update(roomRef, { p2: 'connected' });
             document.getElementById('myRole').innerText = "플레이어 2 (후공 팀)";
         } else {
             myRole = 'spectator';
             document.getElementById('myRole').innerText = "관전자";
             document.getElementById('status').innerText = "방이 가득 찼습니다. 관전 중...";
         }
+    }).catch((error) => {
+        document.getElementById('status').innerText = "네트워크 오류 발생. 다시 열어주세요.";
+        console.error(error);
     });
 
-    // 2. 실시간 데이터베이스 변동 감지 (핵심 동기화)
-    db.on('value', (snapshot) => {
+    // 2. 실시간 데이터 변화 감지
+    onValue(roomRef, (snapshot) => {
         const data = snapshot.val() || {};
         p1Choice = data.p1Choice;
         p2Choice = data.p2Choice;
 
-        // 플레이어 접속 현황 업데이트
         if (myRole !== 'spectator') {
             if (data.p1 && data.p2) {
                 document.getElementById('status').innerText = "양쪽 모두 접속 완료! 가위바위보를 선택하세요.";
@@ -156,11 +165,9 @@
             }
         }
 
-        // 실시간 선택 완료 상태 표시 (무엇을 냈는지는 숨김)
         document.getElementById('p1State').innerText = p1Choice ? "선택 완료 🔒" : (data.p1 ? "고르는 중..." : "미접속");
         document.getElementById('p2State').innerText = p2Choice ? "선택 완료 🔒" : (data.p2 ? "고르는 중..." : "미접속");
 
-        // 두 명 모두 골랐을 때 결과 판정
         if (p1Choice && p2Choice) {
             enableButtons(false);
             document.getElementById('p1State').innerText = p1Choice;
@@ -174,14 +181,18 @@
         }
     });
 
-    // 3. 내 가위바위보 선택 데이터 전송
-    function sendChoice(choice) {
-        if (myRole === 'p1') db.update({ p1Choice: choice });
-        if (myRole === 'p2') db.update({ p2Choice: choice });
+    // 전역 함수 등록 (HTML 내부의 onclick과 연동하기 위함)
+    window.sendChoice = function(choice) {
+        if (myRole === 'p1') update(roomRef, { p1Choice: choice });
+        if (myRole === 'p2') update(roomRef, { p2Choice: choice });
         enableButtons(false);
     }
 
-    // 4. 결과 계산 및 UI 반영
+    window.requestReset = function() {
+        update(roomRef, { p1Choice: null, p2Choice: null });
+        document.getElementById('finalResult').innerText = "새 게임이 시작되었습니다. 다시 골라주세요!";
+    }
+
     function judgeResult() {
         const resultEl = document.getElementById('finalResult');
         if (p1Choice === p2Choice) {
@@ -202,12 +213,6 @@
         }
     }
 
-    // 5. 다시 하기 (데이터 초기화)
-    function requestReset() {
-        db.update({ p1Choice: null, p2Choice: null });
-        document.getElementById('finalResult').innerText = "새 게임이 시작되었습니다. 다시 골라주세요!";
-    }
-
     function enableButtons(bool) {
         if (myRole === 'spectator') return;
         document.getElementById('btnScissors').disabled = !bool;
@@ -215,10 +220,10 @@
         document.getElementById('btnPaper').disabled = !bool;
     }
 
-    // 브라우저 종료 시 유저 나감 처리
+    // 나갈 때 청소
     window.addEventListener('beforeunload', () => {
-        if (myRole === 'p1') db.update({ p1: null, p1Choice: null });
-        if (myRole === 'p2') db.update({ p2: null, p2Choice: null });
+        if (myRole === 'p1') update(roomRef, { p1: null, p1Choice: null });
+        if (myRole === 'p2') update(roomRef, { p2: null, p2Choice: null });
     });
 </script>
 </body>
