@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>발로란트 내전용 가위바위보 프로그램</title>
-    <!-- [수정] 차단 없는 공식 최신 PeerJS 라이브러리 로드 -->
-    <script src="https://cloudflare.com"></script>
+    <!-- [수정] GitHub Pages 및 외부 CDN 간의 CORS 블로킹을 해제하기 위해 crossOrigin 속성 명시 -->
+    <script src="https://cloudflare.com" crossorigin="anonymous"></script>
     <style>
         body {
             font-family: 'Noto Sans KR', sans-serif;
@@ -94,7 +94,6 @@
 <body>
 
 <div class="container">
-    <!-- [수정] 태그 중복 오류 해결 -->
     <h1>공수 가르기 가위바위보</h1>
     <div id="status" class="status-indicator">서버 연결 중...</div>
     
@@ -121,7 +120,7 @@
     let oppChoice = null;
     let isHost = true;
 
-    // [수정] 라이브러리가 완전히 준비된 뒤 단 한 번만 실행되도록 구조 일원화
+    // 페이지 로드 완료 후 Peer 엔진 초기화
     window.addEventListener('load', () => {
         if (typeof Peer === 'undefined') {
             document.getElementById('status').innerText = "라이브러리 로드 실패. 페이지를 새로고침 해주세요.";
@@ -135,6 +134,7 @@
         const roomParam = urlParams.get('room');
 
         if (roomParam) {
+            // 초대 링크 진입자 (Player 2)
             isHost = false;
             document.getElementById('myRole').innerText = "참가자 (Player 2)";
             document.getElementById('status').innerText = "방장에게 연결을 시도하는 중...";
@@ -145,6 +145,7 @@
                 setupConnection();
             });
         } else {
+            // 방 개설자 (Player 1)
             isHost = true;
             const randomRoomId = 'vlr-' + Math.random().toString(36).substr(2, 9);
             peer = new Peer(randomRoomId);
@@ -167,6 +168,7 @@
         });
     }
 
+    // P2P 연결 완료 후 이벤트 바인딩
     function setupConnection() {
         conn.on('open', () => {
             document.getElementById('status').innerText = "⚡ 상대방과 실시간 연결 성공! 선택해 주세요.";
@@ -189,6 +191,7 @@
         });
     }
 
+    // 내 선택 핸들링 및 상대에게 전송
     function sendChoice(choice) {
         myChoice = choice;
         document.getElementById('myState').innerText = choice;
@@ -200,7 +203,7 @@
         checkResult();
     }
 
-    // [수정] 잘려 있던 조건문 및 결과 판정 로직 완벽 복구
+    // 결과 정밀 검증 및 렌더링
     function checkResult() {
         if (myChoice && oppChoice) {
             document.getElementById('oppState').innerText = oppChoice;
