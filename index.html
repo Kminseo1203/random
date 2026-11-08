@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>발로란트 내전용 가위바위보 프로그램</title>
-    <!-- [수정] GitHub Pages 및 외부 CDN 간의 CORS 블로킹을 해제하기 위해 crossOrigin 속성 명시 -->
+    <!-- 가장 안정적인 글로벌 CDN에서 PeerJS 로드 -->
     <script src="https://cloudflare.com" crossorigin="anonymous"></script>
     <style>
         body {
@@ -120,10 +120,17 @@
     let oppChoice = null;
     let isHost = true;
 
-    // 페이지 로드 완료 후 Peer 엔진 초기화
+    // 💡 [수정] Cloudflare 차단을 방지하기 위해 신뢰성 높은 오픈소스 공용 무료 시그널링 서버 정보 지정
+    const customConfig = {
+        host: 'peerjs.metered.live',
+        port: 443,
+        path: '/',
+        secure: true
+    };
+
     window.addEventListener('load', () => {
         if (typeof Peer === 'undefined') {
-            document.getElementById('status').innerText = "라이브러리 로드 실패. 페이지를 새로고침 해주세요.";
+            document.getElementById('status').innerText = "라이브러리 로드 실패. 새로고침 해주세요.";
             return;
         }
         initGame();
@@ -134,21 +141,22 @@
         const roomParam = urlParams.get('room');
 
         if (roomParam) {
-            // 초대 링크 진입자 (Player 2)
             isHost = false;
             document.getElementById('myRole').innerText = "참가자 (Player 2)";
             document.getElementById('status').innerText = "방장에게 연결을 시도하는 중...";
             
-            peer = new Peer();
+            // [수정] 커스텀 서버 옵션을 넣어서 인스턴스 생성
+            peer = new Peer(customConfig);
             peer.on('open', () => {
                 conn = peer.connect(roomParam);
                 setupConnection();
             });
         } else {
-            // 방 개설자 (Player 1)
             isHost = true;
             const randomRoomId = 'vlr-' + Math.random().toString(36).substr(2, 9);
-            peer = new Peer(randomRoomId);
+            
+            // [수정] 커스텀 서버 옵션을 넣어서 인스턴스 생성
+            peer = new Peer(randomRoomId, customConfig);
             
             peer.on('open', (id) => {
                 const baseUrl = window.location.href.split('?')[0];
@@ -168,7 +176,6 @@
         });
     }
 
-    // P2P 연결 완료 후 이벤트 바인딩
     function setupConnection() {
         conn.on('open', () => {
             document.getElementById('status').innerText = "⚡ 상대방과 실시간 연결 성공! 선택해 주세요.";
@@ -191,7 +198,6 @@
         });
     }
 
-    // 내 선택 핸들링 및 상대에게 전송
     function sendChoice(choice) {
         myChoice = choice;
         document.getElementById('myState').innerText = choice;
@@ -203,7 +209,6 @@
         checkResult();
     }
 
-    // 결과 정밀 검증 및 렌더링
     function checkResult() {
         if (myChoice && oppChoice) {
             document.getElementById('oppState').innerText = oppChoice;
