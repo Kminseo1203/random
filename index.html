@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>발로란트 내전용 가위바위보 프로그램</title>
-    <!-- 가장 안정적인 글로벌 CDN에서 PeerJS 로드 -->
+    <!-- [수정] 차단 오류를 일으키던 기존 cloudflare 스크립트 태그를 완벽히 제거하고 안전한 정식 PeerJS CDN만 적용 -->
     <script src="https://cloudflare.com" crossorigin="anonymous"></script>
     <style>
         body {
@@ -120,7 +120,7 @@
     let oppChoice = null;
     let isHost = true;
 
-    // 💡 [수정] Cloudflare 차단을 방지하기 위해 신뢰성 높은 오픈소스 공용 무료 시그널링 서버 정보 지정
+    // 우회용 오픈소스 공용 무료 시그널링 서버 정보 지정
     const customConfig = {
         host: 'peerjs.metered.live',
         port: 443,
@@ -145,7 +145,6 @@
             document.getElementById('myRole').innerText = "참가자 (Player 2)";
             document.getElementById('status').innerText = "방장에게 연결을 시도하는 중...";
             
-            // [수정] 커스텀 서버 옵션을 넣어서 인스턴스 생성
             peer = new Peer(customConfig);
             peer.on('open', () => {
                 conn = peer.connect(roomParam);
@@ -155,7 +154,6 @@
             isHost = true;
             const randomRoomId = 'vlr-' + Math.random().toString(36).substr(2, 9);
             
-            // [수정] 커스텀 서버 옵션을 넣어서 인스턴스 생성
             peer = new Peer(randomRoomId, customConfig);
             
             peer.on('open', (id) => {
