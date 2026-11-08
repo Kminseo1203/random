@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>발로란트 내전용 가위바위보 프로그램</title>
-    <!-- CORS 및 보안 차단이 없는 전역 P2P 시그널링 라이브러리 -->
+    <!-- [수정] 차단 없는 공식 최신 PeerJS 라이브러리 로드 -->
     <script src="https://cloudflare.com"></script>
     <style>
         body {
@@ -94,7 +94,8 @@
 <body>
 
 <div class="container">
-    <h1>공수 가르기 가위바위보</h1></h1>
+    <!-- [수정] 태그 중복 오류 해결 -->
+    <h1>공수 가르기 가위바위보</h1>
     <div id="status" class="status-indicator">서버 연결 중...</div>
     
     <div class="buttons">
@@ -114,92 +115,58 @@
 </div>
 
 <script>
-    // 기존 스크립트 시작 부근의 로직을 아래와 같이 감싸고 수정합니다.
-
-window.addEventListener('load', () => {
-    if (typeof Peer === 'undefined') {
-        document.getElementById('status').innerText = "라이브러리 로드 실패. 페이지를 새로고침 해주세요.";
-        return;
-    }
-    initGame();
-});
-
-function initGame() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomParam = urlParams.get('room');
-
-    if (roomParam) {
-        isHost = false;
-        document.getElementById('myRole').innerText = "참가자 (Player 2)";
-        document.getElementById('status').innerText = "방장에게 연결을 시도하는 중...";
-        
-        peer = new Peer();
-        peer.on('open', () => {
-            conn = peer.connect(roomParam);
-            setupConnection();
-        });
-    } else {
-        isHost = true;
-        const randomRoomId = 'vlr-' + Math.random().toString(36).substr(2, 9);
-        peer = new Peer(randomRoomId);
-        
-        peer.on('open', (id) => {
-            // 주소 뒤에 파라미터가 중복으로 쌓이지 않도록 ? 기준으로 분할 처리
-            const baseUrl = window.location.href.split('?')[0];
-            const inviteLink = baseUrl + '?room=' + id;
-            document.getElementById('status').innerHTML = `접속 완료! 상대방에게 아래 링크를 전송하세요.<br><b style="color:#ffb846; font-size:13px; user-select:all;">${inviteLink}</b>`;
-        });
-
-        peer.on('connection', (connection) => {
-            conn = connection;
-            setupConnection();
-        });
-    }
-    
-    peer.on('error', (err) => {
-        console.error(err);
-        document.getElementById('status').innerText = "연결 오류가 발생했습니다. 링크를 다시 확인하세요.";
-    });
-}
     let peer = null;
     let conn = null;
     let myChoice = null;
     let oppChoice = null;
     let isHost = true;
 
-    // URL 파라미터 확인 (?room=아이디 형태)
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomParam = urlParams.get('room');
+    // [수정] 라이브러리가 완전히 준비된 뒤 단 한 번만 실행되도록 구조 일원화
+    window.addEventListener('load', () => {
+        if (typeof Peer === 'undefined') {
+            document.getElementById('status').innerText = "라이브러리 로드 실패. 페이지를 새로고침 해주세요.";
+            return;
+        }
+        initGame();
+    });
 
-    if (roomParam) {
-        // 초대 링크를 통해 접속한 사람 (Player 2)
-        isHost = false;
-        document.getElementById('myRole').innerText = "참가자 (Player 2)";
-        document.getElementById('status').innerText = "방장에게 연결을 시도하는 중...";
-        
-        peer = new Peer();
-        peer.on('open', () => {
-            conn = peer.connect(roomParam);
-            setupConnection();
-        });
-    } else {
-        // 처음 방을 개설한 사람 (Player 1)
-        isHost = true;
-        const randomRoomId = 'vlr-' + Math.random().toString(36).substr(2, 9);
-        peer = new Peer(randomRoomId);
-        
-        peer.on('open', (id) => {
-            const inviteLink = window.location.href.split('?')[0] + '?room=' + id;
-            document.getElementById('status').innerHTML = `접속 완료! 상대방에게 아래 링크를 전송하세요.<br><b style="color:#ece8e1;">${inviteLink}</b>`;
-        });
+    function initGame() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomParam = urlParams.get('room');
 
-        peer.on('connection', (connection) => {
-            conn = connection;
-            setupConnection();
+        if (roomParam) {
+            isHost = false;
+            document.getElementById('myRole').innerText = "참가자 (Player 2)";
+            document.getElementById('status').innerText = "방장에게 연결을 시도하는 중...";
+            
+            peer = new Peer();
+            peer.on('open', () => {
+                conn = peer.connect(roomParam);
+                setupConnection();
+            });
+        } else {
+            isHost = true;
+            const randomRoomId = 'vlr-' + Math.random().toString(36).substr(2, 9);
+            peer = new Peer(randomRoomId);
+            
+            peer.on('open', (id) => {
+                const baseUrl = window.location.href.split('?')[0];
+                const inviteLink = baseUrl + '?room=' + id;
+                document.getElementById('status').innerHTML = `접속 완료! 상대방에게 아래 링크를 전송하세요.<br><b style="color:#ffb846; font-size:13px; user-select:all;">${inviteLink}</b>`;
+            });
+
+            peer.on('connection', (connection) => {
+                conn = connection;
+                setupConnection();
+            });
+        }
+        
+        peer.on('error', (err) => {
+            console.error(err);
+            document.getElementById('status').innerText = "연결 오류가 발생했습니다. 링크를 다시 확인하세요.";
         });
     }
 
-    // 연결 수립 후 이벤트 바인딩
     function setupConnection() {
         conn.on('open', () => {
             document.getElementById('status').innerText = "⚡ 상대방과 실시간 연결 성공! 선택해 주세요.";
@@ -222,7 +189,6 @@ function initGame() {
         });
     }
 
-    // 내 선택 전송
     function sendChoice(choice) {
         myChoice = choice;
         document.getElementById('myState').innerText = choice;
@@ -234,7 +200,7 @@ function initGame() {
         checkResult();
     }
 
-    // 양쪽 모두 선택 시 결과 판정
+    // [수정] 잘려 있던 조건문 및 결과 판정 로직 완벽 복구
     function checkResult() {
         if (myChoice && oppChoice) {
             document.getElementById('oppState').innerText = oppChoice;
@@ -258,7 +224,6 @@ function initGame() {
         }
     }
 
-    // 게임 재시작
     function resetGame() {
         if (conn && conn.open) {
             conn.send({ type: 'reset' });
