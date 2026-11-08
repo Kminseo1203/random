@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>발로란트 내전용 가위바위보</title>
+    <title>발로란트 내전용 가위바위보 프로그램</title>
+    <!-- CORS 및 보안 차단이 없는 전역 P2P 시그널링 라이브러리 -->
+    <script src="https://unpkg.com"></script>
     <style>
         body {
             font-family: 'Noto Sans KR', sans-serif;
@@ -28,13 +30,14 @@
         }
         h1 { color: #ff4655; margin-bottom: 10px; font-size: 24px; }
         .status-indicator {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             color: #ffb846;
             background-color: rgba(255, 184, 70, 0.1);
-            padding: 8px;
+            padding: 10px;
             border-radius: 6px;
+            word-break: break-all;
         }
         .buttons {
             display: flex;
@@ -58,7 +61,7 @@
             transform: translateY(-3px);
         }
         button:disabled {
-            opacity: 0.5;
+            opacity: 0.3;
             cursor: not-allowed;
         }
         .result-box {
@@ -84,147 +87,154 @@
             border: none;
             border-radius: 8px;
             cursor: pointer;
+            display: none;
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>실시간 매칭 가위바위보 </h1>
+    <h1>공수 가르기 가위바위보</h1></h1>
     <div id="status" class="status-indicator">서버 연결 중...</div>
     
-    <div class="buttons" id="btnGroup">
+    <div class="buttons">
         <button onclick="sendChoice('가위')" id="btnScissors" disabled>✌️</button>
         <button onclick="sendChoice('바위')" id="btnRock" disabled>✊</button>
         <button onclick="sendChoice('보')" id="btnPaper" disabled>🖐️</button>
     </div>
 
     <div class="result-box">
-        <div class="choice-text">내 역할: <span id="myRole">-</span></div>
-        <div class="choice-text">플레이어 1: <span id="p1State">대기 중...</span></div>
-        <div class="choice-text">플레이어 2: <span id="p2State">대기 중...</span></div>
-        <div id="finalResult">상대방을 기다리는 중입니다.</div>
+        <div class="choice-text">내 역할: <span id="myRole">방장 (Player 1)</span></div>
+        <div class="choice-text">나의 선택: <span id="myState">대기 중...</span></div>
+        <div class="choice-text">상대 선택: <span id="oppState">대기 중...</span></div>
+        <div id="finalResult">상대방이 연결되면 시작할 수 있습니다.</div>
     </div>
     
-    <button class="reset-btn" id="resetBtn" onclick="requestReset()" style="display:none;">다시 경기하기 🔄</button>
+    <button class="reset-btn" id="resetBtn" onclick="resetGame()">다시 경기하기 🔄</button>
 </div>
 
-<!-- 최신 Firebase v10 모듈 스크립트 사용 -->
-<script type="module">
-    import { initializeApp } from "https://gstatic.com";
-    import { getDatabase, ref, onValue, update, get } from "https://gstatic.com";
+<script>
+    let peer = null;
+    let conn = null;
+    let myChoice = null;
+    let oppChoice = null;
+    let isHost = true;
 
-    // 공용 임시 DB 설정
-    const firebaseConfig = {
-        databaseURL: "https://firebaseio.com"
-    };
-    
-    const app = initializeApp(firebaseConfig);
-    const database = getDatabase(app);
-    // 💡 아래 "game_room" 부분을 우리 팀만의 영어 단어로 바꾸면 독립된 방이 됩니다!
-    const roomRef = ref(database, "game_room"); 
+    // URL 파라미터 확인 (?room=아이디 형태)
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
 
-    let myRole = null; 
-    let p1Choice = null;
-    let p2Choice = null;
+    if (roomParam) {
+        // 초대 링크를 통해 접속한 사람 (Player 2)
+        isHost = false;
+        document.getElementById('myRole').innerText = "참가자 (Player 2)";
+        document.getElementById('status').innerText = "방장에게 연결을 시도하는 중...";
+        
+        peer = new Peer();
+        peer.on('open', () => {
+            conn = peer.connect(roomParam);
+            setupConnection();
+        });
+    } else {
+        // 처음 방을 개설한 사람 (Player 1)
+        isHost = true;
+        const randomRoomId = 'vlr-' + Math.random().toString(36).substr(2, 9);
+        peer = new Peer(randomRoomId);
+        
+        peer.on('open', (id) => {
+            const inviteLink = window.location.href.split('?')[0] + '?room=' + id;
+            document.getElementById('status').innerHTML = `접속 완료! 상대방에게 아래 링크를 전송하세요.<br><b style="color:#ece8e1;">${inviteLink}</b>`;
+        });
 
-    // 1. 방 접속 및 플레이어 역할 할당
-    get(roomRef).then((snapshot) => {
-        const data = snapshot.val() || {};
-        if (!data.p1) {
-            myRole = 'p1';
-            update(roomRef, { p1: 'connected' });
-            document.getElementById('myRole').innerText = "플레이어 1 (선공 팀)";
-        } else if (!data.p2) {
-            myRole = 'p2';
-            update(roomRef, { p2: 'connected' });
-            document.getElementById('myRole').innerText = "플레이어 2 (후공 팀)";
-        } else {
-            myRole = 'spectator';
-            document.getElementById('myRole').innerText = "관전자";
-            document.getElementById('status').innerText = "방이 가득 찼습니다. 관전 중...";
-        }
-    }).catch((error) => {
-        document.getElementById('status').innerText = "네트워크 오류 발생. 다시 열어주세요.";
-        console.error(error);
-    });
+        peer.on('connection', (connection) => {
+            conn = connection;
+            setupConnection();
+        });
+    }
 
-    // 2. 실시간 데이터 변화 감지
-    onValue(roomRef, (snapshot) => {
-        const data = snapshot.val() || {};
-        p1Choice = data.p1Choice;
-        p2Choice = data.p2Choice;
+    // 연결 수립 후 이벤트 바인딩
+    function setupConnection() {
+        conn.on('open', () => {
+            document.getElementById('status').innerText = "⚡ 상대방과 실시간 연결 성공! 선택해 주세요.";
+            enableButtons(true);
+        });
 
-        if (myRole !== 'spectator') {
-            if (data.p1 && data.p2) {
-                document.getElementById('status').innerText = "양쪽 모두 접속 완료! 가위바위보를 선택하세요.";
-                enableButtons(true);
-            } else {
-                document.getElementById('status').innerText = "상대방의 접속을 기다리고 있습니다...";
-                enableButtons(false);
+        conn.on('data', (data) => {
+            if (data.type === 'choice') {
+                oppChoice = data.value;
+                document.getElementById('oppState').innerText = "선택 완료 🔒";
+                checkResult();
+            } else if (data.type === 'reset') {
+                clearGame();
             }
-        }
+        });
 
-        document.getElementById('p1State').innerText = p1Choice ? "선택 완료 🔒" : (data.p1 ? "고르는 중..." : "미접속");
-        document.getElementById('p2State').innerText = p2Choice ? "선택 완료 🔒" : (data.p2 ? "고르는 중..." : "미접속");
-
-        if (p1Choice && p2Choice) {
+        conn.on('close', () => {
+            document.getElementById('status').innerText = "상대방과의 연결이 끊겼습니다.";
             enableButtons(false);
-            document.getElementById('p1State').innerText = p1Choice;
-            document.getElementById('p2State').innerText = p2Choice;
-            
-            judgeResult();
-            document.getElementById('resetBtn').style.display = 'block';
-        } else {
-            document.getElementById('resetBtn').style.display = 'none';
-            document.getElementById('finalResult').className = "";
-        }
-    });
+        });
+    }
 
-    // 전역 함수 등록 (HTML 내부의 onclick과 연동하기 위함)
-    window.sendChoice = function(choice) {
-        if (myRole === 'p1') update(roomRef, { p1Choice: choice });
-        if (myRole === 'p2') update(roomRef, { p2Choice: choice });
+    // 내 선택 전송
+    function sendChoice(choice) {
+        myChoice = choice;
+        document.getElementById('myState').innerText = choice;
         enableButtons(false);
-    }
-
-    window.requestReset = function() {
-        update(roomRef, { p1Choice: null, p2Choice: null });
-        document.getElementById('finalResult').innerText = "새 게임이 시작되었습니다. 다시 골라주세요!";
-    }
-
-    function judgeResult() {
-        const resultEl = document.getElementById('finalResult');
-        if (p1Choice === p2Choice) {
-            resultEl.innerText = "무승부! 다시 진행해 주세요. 🤝";
-            resultEl.className = "draw";
-        } else if (
-            (p1Choice === '가위' && p2Choice === '보') ||
-            (p1Choice === '바위' && p2Choice === '가위') ||
-            (p1Choice === '보' && p2Choice === '바위')
-        ) {
-            if (myRole === 'p1') { resultEl.innerText = "당신의 승리! 🎉 (진영 선택)"; resultEl.className = "win"; }
-            else if (myRole === 'p2') { resultEl.innerText = "당신의 패배.. 😢 (상대 진영 선택)"; resultEl.className = "lose"; }
-            else { resultEl.innerText = "플레이어 1 승리! 🎉"; }
-        } else {
-            if (myRole === 'p2') { resultEl.innerText = "당신의 승리! 🎉 (진영 선택)"; resultEl.className = "win"; }
-            else if (myRole === 'p1') { resultEl.innerText = "당신의 패배.. 😢 (상대 진영 선택)"; resultEl.className = "lose"; }
-            else { resultEl.innerText = "플레이어 2 승리! 🎉"; }
+        
+        if (conn && conn.open) {
+            conn.send({ type: 'choice', value: choice });
         }
+        checkResult();
+    }
+
+    // 양쪽 모두 선택 시 결과 판정
+    function checkResult() {
+        if (myChoice && oppChoice) {
+            document.getElementById('oppState').innerText = oppChoice;
+            const resultEl = document.getElementById('finalResult');
+            
+            if (myChoice === oppChoice) {
+                resultEl.innerText = "무승부! 다시 진행하세요 🤝";
+                resultEl.className = "draw";
+            } else if (
+                (myChoice === '가위' && oppChoice === '보') ||
+                (myChoice === '바위' && oppChoice === '가위') ||
+                (myChoice === '보' && oppChoice === '바위')
+            ) {
+                resultEl.innerText = "당신의 승리! 진영 선택권을 획득했습니다 🎉";
+                resultEl.className = "win";
+            } else {
+                resultEl.innerText = "당신의 패배.. 상대방이 진영을 선택합니다 😢";
+                resultEl.className = "lose";
+            }
+            document.getElementById('resetBtn').style.display = 'block';
+        }
+    }
+
+    // 게임 재시작
+    function resetGame() {
+        if (conn && conn.open) {
+            conn.send({ type: 'reset' });
+        }
+        clearGame();
+    }
+
+    function clearGame() {
+        myChoice = null;
+        oppChoice = null;
+        document.getElementById('myState').innerText = "대기 중...";
+        document.getElementById('oppState').innerText = "대기 중...";
+        document.getElementById('finalResult').innerText = "양쪽 모두 골라야 결과가 공개됩니다.";
+        document.getElementById('finalResult').className = "";
+        document.getElementById('resetBtn').style.display = 'none';
+        enableButtons(true);
     }
 
     function enableButtons(bool) {
-        if (myRole === 'spectator') return;
         document.getElementById('btnScissors').disabled = !bool;
         document.getElementById('btnRock').disabled = !bool;
         document.getElementById('btnPaper').disabled = !bool;
     }
-
-    // 나갈 때 청소
-    window.addEventListener('beforeunload', () => {
-        if (myRole === 'p1') update(roomRef, { p1: null, p1Choice: null });
-        if (myRole === 'p2') update(roomRef, { p2: null, p2Choice: null });
-    });
 </script>
 </body>
 </html>
